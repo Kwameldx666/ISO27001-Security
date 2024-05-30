@@ -1,0 +1,359 @@
+﻿@{
+    Layout = "~/Views/Shared/_LayoutQ.cshtml";
+    ViewBag.Title = "Questionnaire";
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title</title>
+    <style>
+        body {
+            position: relative;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        h3 {
+            color: #555;
+            margin-bottom: 20px;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: 80%;
+            margin: 0 auto;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        input[type="radio"] {
+            margin-right: 10px;
+        }
+
+        button[type="submit"] {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        button[disabled="disabled"] {
+            cursor: not-allowed;
+            background-color: #0059b8;
+        }
+
+        button[type="submit"]:hover {
+             background-color: #0056b3;
+        }
+
+        .answers input[type="radio"] {
+            display: none;
+        }
+
+        .answers label {
+            display: inline-block;
+            padding: 10px 20px;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            cursor: pointer;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            margin-right: 10px;
+            padding: 10px 50px 10px;
+            user-select: none;
+        }
+
+        input[type="radio"]:checked + label {
+            border-color: green;
+        }
+
+        .questions {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .answers {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .questions_navigation {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .question_button {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            margin: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .navigationButton {
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            cursor: pointer;
+            user-select: none;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+
+        .adminMenu {
+            top: 0;
+            right: 0;
+            padding: 10px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: absolute;
+            z-index: 100;
+            flex-direction: column;
+        }
+
+    </style>
+</head>
+<body>
+    <h2>Добро пожаловать, @ViewBag.CompanyName!</h2>
+
+    <h3>Пожалуйста, ответьте на следующие вопросы:</h3>
+
+    <form action="/Home/Analysis" method="post" style="text-align: center;">
+        @for (int i = 0; i < ViewBag.Questions.Count; i++)
+        {
+            <div class="questions hidden">
+                <p style="color: lightslategray">@(i+1)/@(@ViewBag.Questions.Count)</p>
+                <h2>@ViewBag.Questions[i]</h2>
+                <div class="answers">
+                    <input type="radio" id="answer@(i + 1)_Yes" name="answer@(i + 1)" value="Yes">
+                    <label for="answer@(i + 1)_Yes">Да</label>
+                    <input type="radio" id="answer@(i + 1)_No" name="answer@(i + 1)" value="No">
+                    <label for="answer@(i + 1)_No">Нет</label>
+                </div>
+            </div>
+        }
+        <div class="questions_navigation"></div>
+        <button type="button" class="navigationButton" id="prevQuestionButton">Предыдущий вопрос</button>
+        <button type="submit">Подтвердить</button>
+        <button type="button" class="navigationButton" id="nextQuestionButton">Следующий вопрос</button>
+    </form>
+    <div class="adminMenu hidden">
+        <p>AdminMenu</p>
+        <p><input type="checkbox" id="yesToAll"> Везде "Да"</p>
+        <p><input type="checkbox" id="noToAll"> Везде "Нет"</p>
+        <p><input type="checkbox" id="random"> Случайно</p>
+        <input type="reset" id="reset">
+    </div>
+</body>
+<script>
+    let questions = @Html.Raw(Json.Encode(ViewBag.Questions));
+    let questionDivs = document.querySelectorAll(".questions");
+    questionDivs[0].classList.remove("hidden");
+    let questionsNav = document.querySelector('.questions_navigation');
+    let nextQuestionButton = document.getElementById('nextQuestionButton');
+    let prevQuestionButton = document.getElementById('prevQuestionButton');
+
+    function showQuestion(index) {
+        questionDivs.forEach(function (div) {
+            div.classList.add("hidden");
+        });
+        questionDivs[index].classList.remove("hidden");
+    }
+
+    function updateNavigation(index, state) {
+        let currentDiv = questionDivs[index];
+        let radioButtons = currentDiv.querySelectorAll('input[type="radio"]');
+        let answered = false;
+
+        radioButtons.forEach(function (radioButton) {
+            if (radioButton.checked) {
+                answered = true;
+            }
+        });
+        if (answered) {
+            questionsNav.children[index].style.backgroundColor = "#a1dda1";
+            questionsNav.children[index].style.borderColor = (state == "Yes") ? "green" : "red";
+
+            if (index < questionDivs.length - 1) {
+                showQuestion(index + 1);
+            }
+        } else {
+            questionsNav.children[index].style.backgroundColor = "#f9f9f9";
+            questionsNav.children[index].style.borderColor = "#ccc"
+        }
+    }
+
+
+    questions.forEach(function (question, index) {
+        let button = document.createElement('div');
+        button.classList.add('question_button');
+        button.textContent = index + 1;
+        button.addEventListener('click', function () {
+            showQuestion(index);
+        });
+        questionsNav.appendChild(button);
+    });
+    let radioButtons = document.querySelectorAll('input[type="radio"]');
+
+    radioButtons.forEach(function (radioButton, index) {
+        radioButton.addEventListener('change', function () {
+            if (this.checked) {
+                updateNavigation(Math.floor(index / 2), this.value);
+            }
+        });
+    });
+
+    nextQuestionButton.addEventListener('click', function () {
+        let currentIndex = Array.from(questionDivs).findIndex(questionDiv => !questionDiv.classList.contains('hidden'));
+
+        if (currentIndex < questionDivs.length - 1) {
+            showQuestion(currentIndex + 1);
+        }
+    });
+
+    prevQuestionButton.addEventListener('click', function () {
+        let currentIndex = Array.from(questionDivs).findIndex(questionDiv => !questionDiv.classList.contains('hidden'));
+
+        if (currentIndex > 0) {
+            showQuestion(currentIndex - 1);
+        }
+    });
+
+    function checkAllQuestionsAnswered() {
+        let allAnswered = true;
+        questionDivs.forEach(function (div) {
+            let radioButtons = div.querySelectorAll('input[type="radio"]');
+            let answered = false;
+            radioButtons.forEach(function (radioButton) {
+                if (radioButton.checked) {
+                    answered = true;
+                }
+            });
+            if (!answered) {
+                allAnswered = false;
+            }
+        });
+        return allAnswered;
+    }
+    
+    function toggleSubmitButton() {
+        let submitButton = document.querySelector('button[type="submit"]');
+        if (checkAllQuestionsAnswered()) {
+            submitButton.removeAttribute('disabled');
+            submitButton.removeAttribute('title');
+        } else {
+            submitButton.setAttribute('disabled', 'disabled');
+            submitButton.setAttribute('title', 'Перед отправкой необходимо ответить на все вопросы.');
+        }
+    }
+
+    radioButtons.forEach(function (radioButton) {
+        radioButton.addEventListener('change', function () {
+            toggleSubmitButton();
+        });
+    });
+
+    toggleSubmitButton();
+
+    function updateNavigationState() {
+        questionDivs.forEach(function (div, index) {
+            let radioButtons = div.querySelectorAll('input[type="radio"]');
+            state = ""
+            radioButtons.forEach(button => {
+                if (button.checked) state = button.value
+            })
+            updateNavigation(index, state);
+            toggleSubmitButton()
+        });
+    }
+    updateNavigationState();
+
+    document.getElementById('yesToAll').addEventListener('change', function () {
+        if (this.checked) {
+            radioButtons.forEach(function (radioButton) {
+                if (radioButton.value === "Yes") radioButton.checked = true;
+            });
+        }
+        this.checked = false
+        updateNavigationState()
+    });
+
+    // Обработчик для чекбокса "Везде Нет"
+    document.getElementById('noToAll').addEventListener('change', function () {
+        if (this.checked) {
+            radioButtons.forEach(function (radioButton) {
+                if (radioButton.value === "No") radioButton.checked = true;
+            });
+        }
+        this.checked = false
+        updateNavigationState()
+    });
+
+    // Обработчик для чекбокса "Случайно"
+    document.getElementById('random').addEventListener('change', function () {
+        if (this.checked) {
+            radioButtons.forEach(function (radioButton, index) {
+                if (!(index % 2)) {
+                    let randomIndex = Math.floor(Math.random() * 2); // 0 или 1
+                    if (randomIndex === 0) radioButton.checked = true;
+                    else radioButtons[index+1].checked = true;
+                }
+            });
+        }
+        this.checked = false
+        updateNavigationState()
+    });
+
+    document.getElementById('reset').addEventListener('click', function () {
+        radioButtons.forEach(function (radioButton) {
+                radioButton.checked = false;
+            });
+        updateNavigationState()
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === '0') {
+            let adminMenu = document.getElementsByClassName('adminMenu')[0];
+            if (adminMenu) {
+                adminMenu.classList.toggle('hidden');
+            }
+        }
+    });
+
+</script>
+</html>

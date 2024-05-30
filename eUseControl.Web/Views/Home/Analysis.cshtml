@@ -1,0 +1,188 @@
+﻿@model eUseControl.Web.Models.RiskLevel
+
+@{
+    Layout = "~/Views/Shared/_LayoutAnalysis.cshtml";
+    ViewBag.Title = "Analysis";
+    int count = Convert.ToInt32(Session["Count"]);
+    List<string> questions = ViewBag.Questions;
+    List<eUseControl.Web.Models.RiskLevel> answers = ViewBag.RiskLevels;
+    List<eUseControl.Web.Models.RiskLevel> riskLevels = ViewBag.RiskLevels;
+    var questionArray = Json.Encode(questions);
+    var levelArray = Json.Encode(riskLevels.Select(level => level.Level));
+}
+
+<style>
+    /* Стили для улучшения внешнего вида */
+    body {
+        display: flex;
+        justify-content: center; /* Выравнивание по горизонтали */
+        align-items: center; /* Выравнивание по вертикали */
+        text-align: center; /* Центрирование текста */
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        color: #333;
+        margin: 0;
+        padding: 20px 20%;
+    }
+    p{
+        margin:0;
+    }
+    h2 {
+        color: #007bff;
+    }
+
+    ul {
+        list-style-type: none;
+        padding: 0;
+    }
+
+    li {
+        margin-bottom: 20px;
+        padding: 10px;
+        background-color: #fff;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    strong {
+        color: #007bff;
+    }
+
+    canvas {
+        justify-content: center;
+        align-items: center;
+        width: 30%;
+        height: 30%;
+    }
+    .totalStatistics {
+        padding: 10px;
+        background-color: #fff;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column; 
+        justify-content: center; 
+        align-items: center; 
+        text-align: center; 
+        margin-bottom: 20px; 
+    }
+    .totalStatistics p {
+       margin: 5px 0;
+    }
+    .backToMenu {
+        border: 2px solid #ccc;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+        cursor: pointer;
+        user-select: none;
+        padding: 10px 20px;
+        font-size: 16px;
+    }
+</style>
+<h2>Аналитика рисков основанных на анкетировании</h2>
+<div class="totalStatistics">
+    <h3>Общая статистика:</h3>
+    <p>Компания: @ViewBag.CompanyName</p>
+    <p>Всего вопросов: @questions.Count</p>
+    <p id="succeedCount">Успешно пройдено: </p>
+    <p id="negativeCount">Пункты требующие внимания: </p>
+    <p><strong id="restingResult"></strong></p>
+    <canvas id="riskChart"></canvas>
+</div>
+<div>
+    <h3>Подробный анализ и рекомендации:</h3>
+    <ul>
+        @for (int i = 0; i < count; i++)
+        {
+            <li>
+                <strong>@questions[i]</strong>
+                <br />
+                Ответ: @(answers[i].Answer == "Yes" ? "Да" : "Нет")
+                <br />
+                @if (riskLevels[i].Level == "Высокий")
+                {
+                    <p>Уровень риска: <strong style="color:red">@riskLevels[i].Level</strong></p>
+                    <br />
+                    <p><strong style="color:black">Рекомендации по снижению риска:</strong> @ViewBag.Recommendations[i]</p>
+                }
+                else
+                {<p>Уровень риска: @riskLevels[i].Level</p>}
+            </li>
+        }
+    </ul>
+</div>
+<button type="button" class="backToMenu" id="backToMenu">Пройти заново</button>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let questionLabels = @Html.Raw(questionArray);
+    let levelData = @Html.Raw(levelArray);
+    let yesCount = 0;
+    let noCount = 0;
+    let unknownCount = 0;
+
+    for (let i = 0; i < levelData.length; i++) {
+        if (levelData[i] === "Низкий") {
+            yesCount++;
+        } else if (levelData[i] === "Высокий") {
+            noCount++;
+        } else {
+            unknownCount++;
+        }
+    }
+
+    let chartData = {
+        labels: ['Да', 'Нет', 'Нет ответа'],
+        datasets: [{
+            data: [yesCount, noCount, unknownCount],
+            backgroundColor: [
+                'green',
+                'red',
+                'gray'
+            ],
+            borderColor: "#fff",
+            borderWidth: 1
+        }]
+    };
+
+    let ctx = document.getElementById('riskChart').getContext('2d');
+
+    let pieChart = new Chart(ctx, {
+        type: 'pie',
+        data: chartData,
+        options: {
+        responsive: false,
+        title: {
+            display: true,
+            text: 'Responses Distribution'
+        }
+    }
+    });
+    document.getElementById('succeedCount').innerText = 'Успешно пройдено: ' + yesCount;
+    document.getElementById('negativeCount').innerText = 'Пункты требующие внимания: ' + (noCount + unknownCount);
+    function calculateResult() {
+        let result = document.getElementById('restingResult');
+        let pracentage = ((yesCount / (yesCount + noCount + unknownCount)) * 100)
+        if (pracentage >= 80) {
+            result.innerText = `Компания соответствует требованиям ISO 27001 (${pracentage.toFixed(2)}%)`;
+            result.style.color = "green";
+        } else {
+            result.innerText = `Компания не соответствует требованиям ISO 27001 (${pracentage.toFixed(2)}%)`;
+            result.style.color = "red";
+        }
+    }
+    calculateResult()
+    let backButton = document.getElementById("backToMenu");
+
+    const beforeUnloadHandler = (event) => {
+        event.preventDefault();
+        event.returnValue = true;
+    };
+
+    backButton.addEventListener("click", function () {
+        window.addEventListener("beforeunload", beforeUnloadHandler);
+        window.location.href = "/";
+    });
+
+    let test = @Html.Raw(Json.Encode(ViewBag))
+</script>
